@@ -62,6 +62,8 @@ set_property(GLOBAL PROPERTY ADDED_EXTENSIONS)
 
 add_subdirectory(extensions)
 
+add_subdirectory(controllers)
+
 ### Personal projects can go here although that is not recommended
 ### PERSONAL_PROJECTS
 
