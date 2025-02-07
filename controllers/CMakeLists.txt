@@ -1,7 +1,5 @@
-option(WITH_BASELINE_CONTROLLERS "Build baseline controllers for mc_rtc (MCC, BWC, LMC)" OFF)
-
-if(NOT WITH_BASELINE_CONTROLLERS)
-  return()
-endif()
+option(WITH_MULTI_CONTACT_CONTROLLER "Build multi contact controller for mc_rtc" OFF)
+option(WITH_BASELINE_WALKING_CONTROLLER "Build baseline walking controller for mc_rtc" OFF)
+option(WITH_LOCOMANIP_MANIPULATOR_CONTROLLER "Build locomanip manipulator controller for mc_rtc" OFF)
 
 include(baseline_controllers.cmake)
