@@ -385,7 +385,7 @@ Changes are:\n${GIT_DIFF_INDEX_OUTPUT}"
     endif()
     set(CONFIGURE_COMMAND
         ${COMMAND_PREFIX} ${EMCMAKE} ${CMAKE_COMMAND} -G "${GENERATOR}" -B
-        "${BINARY_DIR}" -S "${CONFIGURE_SOURCE_DIR}" ${CMAKE_EXTRA_ARGS} ${CMAKE_ARGS}
+        "${BINARY_DIR}" -S "${CONFIGURE_SOURCE_DIR}" ${CMAKE_EXTRA_ARGS}
     )
   else()
     if("${ADD_PROJECT_ARGS_CONFIGURE_COMMAND}" STREQUAL "")
@@ -494,6 +494,7 @@ Changes are:\n${GIT_DIFF_INDEX_OUTPUT}"
     message("GIT_TAG: ${GIT_TAG}")
     message("CONFIGURE_COMMAND IS: ${CONFIGURE_COMMAND}")
     message("BUILD_COMMAND IS: ${BUILD_COMMAND}")
+    message("CMAKE_ARGS IS: ${CMAKE_ARGS}")
     message("INSTALL_COMMAND IS: ${INSTALL_COMMAND}")
     message("EXTRA_INSTALL_COMMAND IS: ${EXTRA_INSTALL_COMMAND}")
     message("TEST_STEP_OPTIONS: ${TEST_STEP_OPTIONS}")
@@ -520,6 +521,7 @@ Changes are:\n${GIT_DIFF_INDEX_OUTPUT}"
     UPDATE_DISCONNECTED ON # We handle updates ourselves with an explicit target
     CONFIGURE_COMMAND ${CONFIGURE_COMMAND}
     BUILD_COMMAND ${BUILD_COMMAND}
+    CMAKE_ARGS ${CMAKE_ARGS}  
     INSTALL_COMMAND ${INSTALL_COMMAND} ${EXTRA_INSTALL_COMMAND}
     USES_TERMINAL_INSTALL TRUE
     ${TEST_STEP_OPTIONS} ${DEPENDS} ${ADD_PROJECT_ARGS_UNPARSED_ARGUMENTS}
@@ -633,7 +635,10 @@ endfunction()
 function(AddCatkinProject NAME)
   set(options)
   set(oneValueArgs WORKSPACE)
-  set(multiValueArgs)
+  set(multiValueArgs
+    CMAKE_ARGS
+    DEPENDS
+  )
   cmake_parse_arguments(
     ADD_CATKIN_PROJECT_ARGS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
   )
@@ -647,12 +652,17 @@ function(AddCatkinProject NAME)
     get_property(WORKSPACE_STAMP GLOBAL PROPERTY CATKIN_WORKSPACE_${WORKSPACE}_STAMP)
     AddProject(
       ${NAME}
-      SOURCE_DIR "${WORKSPACE_DIR}/src/${NAME}" BINARY_DIR
-      "${WORKSPACE_DIR}/src/${NAME}"
-      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${WORKSPACE_STAMP}"
-      BUILD_COMMAND ""
-      INSTALL_COMMAND "" WORKSPACE ${WORKSPACE} SKIP_TEST SKIP_SYMBOLIC_LINKS
-                      ${ADD_CATKIN_PROJECT_ARGS_UNPARSED_ARGUMENTS}
+      SOURCE_DIR "${WORKSPACE_DIR}/src/${NAME}" 
+      BINARY_DIR "${WORKSPACE_DIR}/build/${NAME}"
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ${CMAKE_COMMAND} -E chdir "${WORKSPACE_DIR}" colcon build --packages-select ${NAME} --merge-install
+      --cmake-args -DCMAKE_BUILD_TYPE=$<CONFIG> ${ADD_CATKIN_PROJECT_ARGS_CMAKE_ARGS}
+      INSTALL_COMMAND "" 
+      WORKSPACE ${WORKSPACE} 
+      SKIP_TEST 
+      SKIP_SYMBOLIC_LINKS
+      DEPENDS ${ADD_CATKIN_PROJECT_ARGS_DEPENDS}
+      ${ADD_CATKIN_PROJECT_ARGS_UNPARSED_ARGUMENTS}
     )
     add_dependencies(catkin-build-${WORKSPACE} ${NAME})
     set_property(GLOBAL APPEND PROPERTY CATKIN_WORKSPACE_${WORKSPACE} "${NAME}")
