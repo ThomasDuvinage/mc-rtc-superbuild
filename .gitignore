@@ -3,3 +3,7 @@ devel/
 install/
 **/.devpod-internal
 .ccache/
+
+# Personal, per-checkout dependency overrides (see import/CMakeLists.txt / README.md)
+import/*
+!import/CMakeLists.txt

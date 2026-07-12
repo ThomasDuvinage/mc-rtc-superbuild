@@ -95,8 +95,60 @@ add_custom_target(
 #
 # * MC_RTC_SUPERBUILD_OVERRIDE_<NAME>_<SOURCE> overrides the SOURCE property
 # * MC_RTC_SUPERBUILD_OVERRIDE_<NAME>_GIT_TAG overrides the GIT_TAG property
+#
+# These are also set automatically for you if you call AddProject from a .cmake file
+# placed in the import/ folder (see import/CMakeLists.txt): such calls override the
+# source/tag of NAME if it is declared elsewhere in the superbuild or its extensions,
+# or add NAME as a new project otherwise. This is the recommended way to locally
+# override a dependency without editing this repository or any extension.
+
+# Shared by AddProject and AddCatkinProject: while import/*.cmake files are being
+# processed (see the import/ folder and MC_RTC_SUPERBUILD_IMPORT_MODE below), a call
+# for a CALL_NAME that isn't declared yet is not executed. Instead it is:
+# - stashed under CALL_FUNCTION so it can be replayed as-is once robots and
+#   extensions have been processed, in case CALL_NAME turns out to be a brand new
+#   project rather than an override of an existing one
+# - used to seed the MC_RTC_SUPERBUILD_OVERRIDE_<NAME>_* cache variables from its
+#   SOURCE/GIT_TAG arguments, so that if CALL_NAME *is* declared elsewhere, that
+#   declaration transparently uses the overridden source/tag (AddProject already
+#   honors these variables for every caller, including AddCatkinProject)
+# This is a macro (not a function) so that return() exits the calling
+# AddProject/AddCatkinProject, not just this helper.
+macro(TryCaptureImportedProject CALL_NAME CALL_FUNCTION)
+  get_property(
+    MC_RTC_SUPERBUILD_IMPORT_MODE GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_MODE
+  )
+  if(MC_RTC_SUPERBUILD_IMPORT_MODE AND NOT TARGET ${CALL_NAME})
+    set_property(GLOBAL APPEND PROPERTY MC_RTC_SUPERBUILD_IMPORT_PROJECTS ${CALL_NAME})
+    set_property(
+      GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_FUNCTION_${CALL_NAME} "${CALL_FUNCTION}"
+    )
+    set_property(GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_ARGS_${CALL_NAME} "${ARGN}")
+    get_property(MC_RTC_SUPERBUILD_SOURCES GLOBAL PROPERTY MC_RTC_SUPERBUILD_SOURCES)
+    cmake_parse_arguments(
+      MC_RTC_SUPERBUILD_SEED "" "${MC_RTC_SUPERBUILD_SOURCES};GIT_TAG" "" ${ARGN}
+    )
+    foreach(SOURCE ${MC_RTC_SUPERBUILD_SOURCES})
+      if(MC_RTC_SUPERBUILD_SEED_${SOURCE})
+        set(MC_RTC_SUPERBUILD_OVERRIDE_${CALL_NAME}_${SOURCE}
+            "${MC_RTC_SUPERBUILD_SEED_${SOURCE}}"
+            CACHE STRING "" FORCE
+        )
+      endif()
+    endforeach()
+    if(MC_RTC_SUPERBUILD_SEED_GIT_TAG)
+      set(MC_RTC_SUPERBUILD_OVERRIDE_${CALL_NAME}_GIT_TAG
+          "${MC_RTC_SUPERBUILD_SEED_GIT_TAG}"
+          CACHE STRING "" FORCE
+      )
+    endif()
+    return()
+  endif()
+endmacro()
 
 function(AddProject NAME)
+  trycaptureimportedproject(${NAME} AddProject ${ARGN})
+
   get_property(MC_RTC_SUPERBUILD_SOURCES GLOBAL PROPERTY MC_RTC_SUPERBUILD_SOURCES)
   set(options NO_NINJA NO_COLOR NO_SOURCE_MONITOR CLONE_ONLY SKIP_TEST
               SKIP_SYMBOLIC_LINKS
@@ -125,6 +177,7 @@ function(AddProject NAME)
   cmake_parse_arguments(
     ADD_PROJECT_ARGS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
   )
+
   list(APPEND ADD_PROJECT_ARGS_DEPENDS ${GLOBAL_DEPENDS})
 
   # Handle --parallel jobs option
@@ -715,6 +768,12 @@ endfunction()
 #
 # * WORKSPACE Catkin workspace where the project is cloned, this option is required
 function(AddCatkinProject NAME)
+  # Capture before EnsureValidCatkinWorkspace below: while import/*.cmake is being
+  # processed, catkin workspaces have not been created yet (CreateCatkinWorkspace is
+  # called from mc_rtc.cmake, which runs after the import pass), so this must return
+  # before touching WORKSPACE at all.
+  trycaptureimportedproject(${NAME} AddCatkinProject ${ARGN})
+
   set(options INSTALL_DEPENDENCIES)
   set(oneValueArgs WORKSPACE)
   set(multiValueArgs)

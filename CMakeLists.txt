@@ -106,6 +106,16 @@ endif()
 
 include(cmake/project.cmake)
 
+# Local overrides: import/*.cmake files can call AddProject exactly as any extension
+# would. This first pass only seeds MC_RTC_SUPERBUILD_OVERRIDE_<NAME>_* cache
+# variables from those calls (see cmake/project.cmake) so that any real declaration
+# below (platform dependencies, mc_rtc.cmake, robots, extensions) transparently picks
+# up the overridden source/tag. This must run before anything else that can call
+# AddProject.
+set_property(GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_MODE TRUE)
+add_subdirectory(import)
+set_property(GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_MODE FALSE)
+
 if(APPLE)
   include(cmake/macos-dependencies.cmake)
 endif()
@@ -140,6 +150,21 @@ add_subdirectory(robots)
 set_property(GLOBAL PROPERTY ADDED_EXTENSIONS)
 
 add_subdirectory(extensions)
+
+get_property(
+  MC_RTC_SUPERBUILD_IMPORT_PROJECTS GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_PROJECTS
+)
+foreach(IMPORT_NAME ${MC_RTC_SUPERBUILD_IMPORT_PROJECTS})
+  if(NOT TARGET ${IMPORT_NAME})
+    get_property(
+      IMPORT_ARGS GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_ARGS_${IMPORT_NAME}
+    )
+    get_property(
+      IMPORT_FUNCTION GLOBAL PROPERTY MC_RTC_SUPERBUILD_IMPORT_FUNCTION_${IMPORT_NAME}
+    )
+    cmake_language(CALL ${IMPORT_FUNCTION} ${IMPORT_NAME} ${IMPORT_ARGS})
+  endif()
+endforeach()
 
 # Personal projects can go here although that is not recommended PERSONAL_PROJECTS
 

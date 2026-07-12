@@ -246,6 +246,31 @@ touch extensions/local.cmake
 editor extensions/local.cmake
 ```
 
+Overriding dependencies locally
+--
+
+The `import` folder is a place for personal, per-checkout `AddProject` declarations (only `import/CMakeLists.txt`, the mechanism itself, is tracked). Add a `.cmake` file and call `AddProject` exactly as you would in an extension:
+
+```shell
+touch import/mc_rtc.cmake
+editor import/mc_rtc.cmake
+```
+```cmake
+AddProject(mc_rtc GITHUB myuser/mc_rtc GIT_TAG my-feature-branch)
+```
+
+- If `mc_rtc` is already declared by the superbuild or one of its extensions, this transparently overrides its source/tag (via the `MC_RTC_SUPERBUILD_OVERRIDE_<NAME>_*` cache variables, see `cmake/project.cmake`) instead of conflicting with the existing declaration.
+- If it isn't declared anywhere else, it is added as a new project, same as it would be from `extensions/local.cmake`.
+
+`AddCatkinProject` works the same way, e.g. to override a ROS package's branch:
+```cmake
+AddCatkinProject(mc_rtc_data GIT_TAG my-branch WORKSPACE data_ws)
+```
+
+This is the recommended way to test a branch of a dependency, or add a personal project, without editing this repository or any extension.
+
+Note: the override is implemented with CMake `CACHE` variables, so it persists across reconfigures even if you later remove the `import/*.cmake` file. Run `cmake -U 'MC_RTC_SUPERBUILD_OVERRIDE_*' -S . -B build` (or delete the build folder's `CMakeCache.txt`) to clear stale overrides.
+
 The remainder is an introduction of the functions offered by superbuild to specify your own project.
 
 AddProject
